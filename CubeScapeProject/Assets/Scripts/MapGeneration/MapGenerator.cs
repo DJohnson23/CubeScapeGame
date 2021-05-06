@@ -4,174 +4,109 @@ using UnityEngine;
 
 public class MapGenerator : MonoBehaviour
 {
-    struct DataCoordinate
-    {
-        public int x;
-        public int y;
-        public int z;
+    public ShapeSettings shapeSettings;
 
-        public DataCoordinate(int x, int y, int z)
-        {
-            this.x = x;
-            this.y = y;
-            this.z = z;
-        }
-    }
+    public Material mapMaterial;
+    public int numChunks = 5;
 
-    struct TerrainVoxel
-    {
-        public bool active;
-        public Vector3 position;
-        public DataCoordinate coord;
-    }
+    MapChunk[] chunks;
 
-    static DataCoordinate[] neighborOffsets =
-    {
-        new DataCoordinate( 0, 0, 1),
-        new DataCoordinate( 1, 0, 0),
-        new DataCoordinate( 0, 0,-1),
-        new DataCoordinate(-1, 0, 0),
-        new DataCoordinate( 0, 1, 0),
-        new DataCoordinate( 0,-1, 0)
-    };
+    NoiseFilter[] noiseFilters;
 
-    public Vector3Int mapSize = new Vector3Int(5, 5, 5);
-    public Material mapMat;
-    public float radius = 5;
-
-    int numCubes;
-    TerrainVoxel[] terrainVoxels;
+    int worldSize;
 
     private void Start()
     {
         RefreshMap();
     }
-
     public void RefreshMap()
     {
-        foreach(Transform t in transform)
+        worldSize = shapeSettings.chunkSize * shapeSettings.worldChunks;
+        noiseFilters = new NoiseFilter[shapeSettings.noiseLayers.Length];
+
+        for(int i = 0; i < noiseFilters.Length; i++)
         {
-            DestroyImmediate(t.gameObject);
+            noiseFilters[i] = new NoiseFilter(shapeSettings.noiseLayers[i].noiseSettings);
         }
 
-        numCubes = mapSize.x * mapSize.y * mapSize.z;
-        InitVoxels();
-
-        GameObject newMap = new GameObject("Voxel Map");
-        newMap.transform.SetParent(transform);
-
-        MeshFilter meshFilter = newMap.AddComponent<MeshFilter>();
-        MeshRenderer meshRenderer = newMap.AddComponent<MeshRenderer>();
-
-        List<Vector3> vertices = new List<Vector3>();
-        List<int> triangles = new List<int>();
-        List<Vector3> normals = new List<Vector3>();
-
-        for(int i = 0; i < terrainVoxels.Length; i++)
+        for(int i = transform.childCount - 1; i >= 0; i--)
         {
-            CreateVoxel(vertices, triangles, normals, terrainVoxels[i]);
+            DestroyImmediate(transform.GetChild(i).gameObject);
         }
 
-        Mesh mesh = new Mesh();
-        mesh.vertices = vertices.ToArray();
-        mesh.triangles = triangles.ToArray();
-        mesh.normals = normals.ToArray();
+        chunks = new MapChunk[numChunks * numChunks];
 
-        meshFilter.sharedMesh = mesh;
-        meshRenderer.sharedMaterial = mapMat;
-    }
+        int index = 0;
 
-    void InitVoxels()
-    {
-        terrainVoxels = new TerrainVoxel[numCubes];
-        int cubeIndex = 0;
-
-        Vector3 halfMapSize = new Vector3(mapSize.x / 2.0f, mapSize.y / 2.0f, mapSize.z / 2.0f);
-        float sqrRadius = radius * radius;
-
-        for (int x = 0; x < mapSize.x; x++)
+        for(int x = 0; x < numChunks; x++)
         {
-            for (int y = 0; y < mapSize.y; y++)
+            for(int z = 0; z < numChunks; z++)
             {
-                for (int z = 0; z < mapSize.z; z++)
-                {
-                    TerrainVoxel newVoxel;
-                    newVoxel.position = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f) - halfMapSize;
-                    newVoxel.active = newVoxel.position.sqrMagnitude <= sqrRadius;
-                    newVoxel.coord = new DataCoordinate(x, y, z);
+                Vector3 position = new Vector3(x * shapeSettings.chunkSize, 0, z * shapeSettings.chunkSize);
+                int[,] heightMap = GenerateHeightMap(shapeSettings.chunkSize, shapeSettings.chunkSize, x * shapeSettings.chunkSize, z * shapeSettings.chunkSize);
 
-                    terrainVoxels[cubeIndex++] = newVoxel;
-                }
+                chunks[index++] = new MapChunk(transform, shapeSettings.chunkSize, shapeSettings.chunkHeight, mapMaterial, position, heightMap);
             }
         }
+
     }
 
-    void CreateVoxel(List<Vector3> vertices, List<int> triangles, List<Vector3> normals, TerrainVoxel voxel)
+    int[,] GenerateHeightMap(int mapWidth, int mapHeight, int xOffset, int yOffset)
     {
-        if(!voxel.active)
+        int[,] heightMap = new int[mapWidth, mapHeight];
+
+        for(int y = 0; y < mapHeight; y++)
         {
-            return;
+            for(int x = 0; x < mapWidth; x++)
+            {
+                heightMap[x, y] = GetHeight(x + xOffset, y + yOffset);
+            }
         }
 
-        for (int i = 0; i < 6; i++)
+        return heightMap;
+    }
+
+    int GetHeight(int x, int y)
+    {
+        float firstLayerValue = 0;
+        Vector3 simPoint = Simulate3D(x, y);
+        float height = 0;
+
+        if(noiseFilters.Length > 0)
         {
-            Vector3[] faceVerts = CubeMeshData.FaceVertices(i);
-            Vector3 n = CubeMeshData.normals[i];
+            firstLayerValue = noiseFilters[0].Evaluate(simPoint);
 
-            DataCoordinate offsetCoord = neighborOffsets[i];
-            DataCoordinate neighborCoord = new DataCoordinate(voxel.coord.x + offsetCoord.x, voxel.coord.y + offsetCoord.y, voxel.coord.z + offsetCoord.z);
-
-            if(IsValidCoord(neighborCoord))
+            if(shapeSettings.noiseLayers[0].enabled)
             {
-                TerrainVoxel adjacent = terrainVoxels[to1D(neighborCoord.x, neighborCoord.y, neighborCoord.z)];
+                height = firstLayerValue;
+            }
+        }
 
-                if (adjacent.active)
-                {
-                    continue;
-                }
+        for(int i = 1; i < noiseFilters.Length; i++)
+        {
+            if(shapeSettings.noiseLayers[i].enabled)
+            {
+                float mask = (shapeSettings.noiseLayers[i].useFirstLayerAsMask) ? firstLayerValue : 1;
+                height += noiseFilters[i].Evaluate(simPoint) * mask;
             }
 
-            vertices.Add(faceVerts[0] + voxel.position);
-            vertices.Add(faceVerts[1] + voxel.position);
-            vertices.Add(faceVerts[2] + voxel.position);
-            vertices.Add(faceVerts[3] + voxel.position);
-
-            normals.Add(n);
-            normals.Add(n);
-            normals.Add(n);
-            normals.Add(n);
-
-            triangles.Add(vertices.Count - 4);
-            triangles.Add(vertices.Count - 3);
-            triangles.Add(vertices.Count - 2);
-
-            triangles.Add(vertices.Count - 4);
-            triangles.Add(vertices.Count - 2);
-            triangles.Add(vertices.Count - 1);
         }
 
+        return (int)height;
     }
 
-    bool IsValidCoord(DataCoordinate index)
+    Vector3 Simulate3D(int x, int z)
     {
-        return index.x < mapSize.x && index.y < mapSize.y && index.z < mapSize.z
-            && index.x >= 0 && index.y >= 0 && index.z >= 0;
-    }
 
-    public int to1D(int x, int y, int z)
-    {
-        int zMax = mapSize.z;
-        int yMax = mapSize.y;
+        float latitude = (float)x / worldSize * 2 * Mathf.PI;
+        float longitude = (float)z / worldSize * 2 * Mathf.PI;
+        float radius = worldSize / (2 * Mathf.PI);
 
-        return (x * zMax * yMax) + (y * zMax) + z;
-    }
+        Vector3 point = new Vector3();
+        point.x = radius * Mathf.Cos(latitude) * Mathf.Cos(longitude);
+        point.y = radius * Mathf.Sin(latitude);
+        point.z = radius * Mathf.Cos(latitude) * Mathf.Sin(longitude);
 
-    public int[] to3D(int idx)
-    {
-        int x = idx / (mapSize.z * mapSize.y);
-        idx -= (x * mapSize.z * mapSize.y);
-        int y = idx / mapSize.z;
-        int z = idx % mapSize.z;
-        return new int[] { x, y, z };
+        return point;
     }
 }
