@@ -1,17 +1,36 @@
 using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
 using System.Diagnostics;
+using UnityEngine;
 
 public class MapChunk
 {
 
     struct TerrainVoxel
     {
-        public bool active;
+        public int active;
         public Vector3 localPosition;
         public Vector3Int coord;
         public int typeIndex;
+        public Vector4 color;
+    }
+
+    struct ShaderVoxelType
+    {
+        public int minHeight;
+        public float scale;
+        public Vector3 center;
+    }
+
+    struct Quad
+    {
+        public Vector3 a;
+        public Vector3 b;
+        public Vector3 c;
+        public Vector3 d;
+
+        public Vector3 normal;
+        public Vector4 color;
     }
 
     static Vector3Int[] neighborOffsets =
@@ -38,19 +57,25 @@ public class MapChunk
     MeshFilter mFilter;
     MeshRenderer mRenderer;
 
-    List<Vector3> vertices;
+    Vector3[] vertices;
 
-    List<int> triangles;
-    List<Vector3> normals;
-    List<Color> colors;
+    int[] triangles;
+    Vector3[] normals;
+    Color[] colors;
 
-    public MapChunk(MapGenerator mapGen, Vector3 position, int[,] heightMap)
+    int numActive;
+
+    ComputeShader genMeshShader;
+
+    public MapChunk(MapGenerator mapGen, Vector3 position, int[,] heightMap, ComputeShader genMeshShader)
     {
         this.mapGen = mapGen;
         this.position = position;
         this.chunkSize = mapGen.shapeSettings.chunkSize;
         this.material = mapGen.mapMaterial;
         this.heightMap = heightMap;
+        this.genMeshShader = genMeshShader;
+
         chunkObj = new GameObject("MapChunk");
         chunkObj.transform.SetParent(mapGen.transform);
         chunkObj.transform.position = position;
@@ -66,31 +91,14 @@ public class MapChunk
         numCubes = chunkSize * chunkSize * chunkSize;
         InitVoxels();
 
-        vertices = new List<Vector3>();
-        triangles = new List<int>();
-        normals = new List<Vector3>();
-        colors = new List<Color>();
-
-        Stopwatch sw = new Stopwatch();
-
-        sw.Start();
-
-        for(int i = 0; i < terrainVoxels.Length; i++)
-        {
-            CreateCube(terrainVoxels[i]);
-        }
-
-        sw.Stop();
-
-        UnityEngine.Debug.Log("CreateCubes: " + sw.Elapsed);
+        CreateMesh();
 
         Mesh mesh = new Mesh();
-        mesh.vertices = vertices.ToArray();
-        mesh.subMeshCount = mapGen.voxelTypes.Length;
-        mesh.triangles = triangles.ToArray();
+        mesh.vertices = vertices;
+        mesh.triangles = triangles;
 
-        mesh.normals = normals.ToArray();
-        mesh.colors = colors.ToArray();
+        mesh.normals = normals;
+        mesh.colors = colors;
 
         mFilter.sharedMesh = mesh;
         mRenderer.sharedMaterial = material;
@@ -98,9 +106,7 @@ public class MapChunk
 
     void InitVoxels()
     {
-        Stopwatch sw = new Stopwatch();
-
-        sw.Start();
+        numActive = 0;
 
         terrainVoxels = new TerrainVoxel[numCubes];
         int cubeIndex = 0;
@@ -115,7 +121,13 @@ public class MapChunk
 
                     TerrainVoxel newVoxel;
                     newVoxel.localPosition = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
-                    newVoxel.active = worldY < heightMap[x, z];
+                    newVoxel.active = worldY < heightMap[x, z] ? 1 : 0;
+
+                    if(newVoxel.active == 1)
+                    {
+                        numActive++;
+                    }
+
                     newVoxel.coord = new Vector3Int(x, y, z);
 
                     int typeIndex = 0;
@@ -127,94 +139,118 @@ public class MapChunk
 
                     newVoxel.typeIndex = typeIndex;
 
+                    float colorNoiseVal = mapGen.voxColNoiseFilters[newVoxel.typeIndex].Evaluate(newVoxel.localPosition + position);
+                    newVoxel.color = mapGen.voxelTypes[newVoxel.typeIndex].colorGradient.Evaluate(colorNoiseVal);
+
                     terrainVoxels[cubeIndex++] = newVoxel;
                 }
             }
         }
-
-        sw.Stop();
-
-        UnityEngine.Debug.Log("InitVoxels: " + sw.Elapsed);
     }
 
-    void CreateCube(TerrainVoxel voxel)
+    void CreateMesh()
     {
-        if(!voxel.active)
+        if(numActive == 0)
         {
             return;
         }
 
-        float colorNoiseVal = mapGen.voxColNoiseFilters[voxel.typeIndex].Evaluate(voxel.localPosition + position);
-        Color voxCol = mapGen.voxelTypes[voxel.typeIndex].colorGradient.Evaluate(colorNoiseVal);
+        Stopwatch sw = new Stopwatch();
+        sw.Start();
 
-        for (int i = 0; i < 6; i++)
+        ComputeBuffer voxelsBuffer = new ComputeBuffer(terrainVoxels.Length, sizeof(int) + sizeof(float) * 7 + sizeof(int) * 4);
+        ComputeBuffer voxelTypesBuffer = new ComputeBuffer(mapGen.voxelTypes.Length, sizeof(int) + sizeof(float) * 4);
+
+        ComputeBuffer quadListBuffer = new ComputeBuffer(numActive * 6, sizeof(float) * 19, ComputeBufferType.Append);
+        quadListBuffer.SetCounterValue(0);
+
+        ShaderVoxelType[] voxelTypes = new ShaderVoxelType[mapGen.voxelTypes.Length];
+
+        for(int i = 0; i < voxelTypes.Length; i++)
         {
-            Vector3[] faceVerts = CubeMeshData.FaceVertices(i);
-            Vector3 n = CubeMeshData.normals[i];
+            VoxelType voxType = mapGen.voxelTypes[i];
+            
+            ShaderVoxelType newType = new ShaderVoxelType();
+            newType.minHeight = voxType.minHeight;
+            newType.scale = voxType.noiseSettings.scale;
+            newType.center = voxType.noiseSettings.center;
 
-            Vector3Int offsetCoord = neighborOffsets[i];
-            Vector3Int neighborCoord = new Vector3Int(voxel.coord.x + offsetCoord.x, voxel.coord.y + offsetCoord.y, voxel.coord.z + offsetCoord.z);
-
-            if(IsValidCoord(neighborCoord))
-            {
-                TerrainVoxel adjacent = terrainVoxels[to1D(neighborCoord.x, neighborCoord.y, neighborCoord.z)];
-
-                if (adjacent.active)
-                {
-                    continue;
-                }
-            }
-
-            vertices.Add(faceVerts[0] + voxel.localPosition);
-            vertices.Add(faceVerts[1] + voxel.localPosition);
-            vertices.Add(faceVerts[2] + voxel.localPosition);
-            vertices.Add(faceVerts[3] + voxel.localPosition);
-
-            normals.Add(n);
-            normals.Add(n);
-            normals.Add(n);
-            normals.Add(n);
-
-            colors.Add(voxCol);
-            colors.Add(voxCol);
-            colors.Add(voxCol);
-            colors.Add(voxCol);
-
-            triangles.Add(vertices.Count - 4);
-            triangles.Add(vertices.Count - 3);
-            triangles.Add(vertices.Count - 2);
-
-            triangles.Add(vertices.Count - 4);
-            triangles.Add(vertices.Count - 2);
-            triangles.Add(vertices.Count - 1);
-
+            voxelTypes[i] = newType;
         }
 
-    }
+        voxelsBuffer.SetData(terrainVoxels);
+        voxelTypesBuffer.SetData(voxelTypes);
 
-    bool IsValidCoord(Vector3Int index)
-    {
-        return index.x < chunkSize && index.y < chunkSize && index.z < chunkSize
-            && index.x >= 0 && index.y >= 0 && index.z >= 0;
-    }
+        genMeshShader.SetBuffer(0, "voxels", voxelsBuffer);
+        genMeshShader.SetBuffer(0, "voxelTypes", voxelTypesBuffer);
+        genMeshShader.SetBuffer(0, "quadList", quadListBuffer);
+        genMeshShader.SetInt("chunkSize", chunkSize);
 
-    public int to1D(int x, int y, int z)
-    {
-        int yMax = chunkSize;
-        int zMax = chunkSize;
+        int numGroups = Mathf.CeilToInt(chunkSize / 8f);
 
-        return (x * zMax * yMax) + (y * zMax) + z;
-    }
+        genMeshShader.Dispatch(0, numGroups, numGroups, numGroups);
 
-    public int[] to3D(int idx)
-    {
-        int yMax = chunkSize;
-        int zMax = chunkSize;
+        int[] args = { 0 };
+        ComputeBuffer argsBuffer = new ComputeBuffer(1, sizeof(int), ComputeBufferType.IndirectArguments);
+        argsBuffer.SetData(args);
 
-        int x = idx / (zMax * yMax);
-        idx -= (x * zMax * yMax);
-        int y = idx / zMax;
-        int z = idx % zMax;
-        return new int[] { x, y, z };
+        ComputeBuffer.CopyCount(quadListBuffer, argsBuffer, 0);
+        argsBuffer.GetData(args);
+
+        Quad[] quadList = new Quad[args[0]];
+        quadListBuffer.GetData(quadList);
+
+        int v = 0;
+        int t = 0;
+
+        Stopwatch sw2 = new Stopwatch();
+
+        sw2.Start();
+
+        vertices = new Vector3[quadList.Length * 4];
+        normals = new Vector3[vertices.Length];
+        colors = new Color[vertices.Length];
+        triangles = new int[quadList.Length * 6];
+
+        foreach(Quad quad in quadList)
+        {
+            vertices[v    ] = quad.a;
+            vertices[v + 1] = quad.b;
+            vertices[v + 2] = quad.c;
+            vertices[v + 3] = quad.d;
+
+            normals[v    ] = quad.normal;
+            normals[v + 1] = quad.normal;
+            normals[v + 2] = quad.normal;
+            normals[v + 3] = quad.normal;
+
+            colors[v    ] = quad.color;
+            colors[v + 1] = quad.color;
+            colors[v + 2] = quad.color;
+            colors[v + 3] = quad.color;
+
+            triangles[t++] = v;
+            triangles[t++] = v + 1;
+            triangles[t++] = v + 2;
+
+            triangles[t++] = v;
+            triangles[t++] = v + 2;
+            triangles[t++] = v + 3;
+
+            v += 4;
+        }
+
+        sw2.Stop();
+
+        UnityEngine.Debug.Log("sw2: " + sw2.Elapsed);
+
+        argsBuffer.Release();
+        voxelsBuffer.Release();
+        voxelTypesBuffer.Release();
+        quadListBuffer.Release();
+
+        sw.Stop();
+
+        UnityEngine.Debug.Log("sw: " + sw.Elapsed);
     }
 }

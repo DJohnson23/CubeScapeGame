@@ -5,3 +5,28 @@ Cmd: compileComputeKernel
   insize=2774 file=C:/Users/gsocc/OneDrive/Desktop/Github/CubeScapeGame/CubeScapeProject/Assets/Shaders/Compute/VoxelMeshCreationShader.compute kernel=CSMain cachingPP=1 ppOnly=0 stripLineD=0 buildPlatform=5 km=<UNITY_VERSION=202035> pKW=UNITY_ENABLE_REFLECTION_BUFFERS UNITY_USE_DITHER_MASK_FOR_ALPHABLENDED_SHADOWS UNITY_PBS_USE_BRDF1 UNITY_SPECCUBE_BOX_PROJECTION UNITY_SPECCUBE_BLENDING UNITY_ENABLE_DETAIL_NORMALMAP SHADER_API_DESKTOP UNITY_LIGHT_PROBE_PROXY_VOLUME UNITY_LIGHTMAP_RGBM_ENCODING uKW=SHADER_STAGE_COMPUTE platform=d3d11 flags=0  error: 2 plat 4 at VoxelMeshCreationShader.compute(68): undeclared identifier 'mapGen'
  ok=0 outsize=0
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Cmd: compileComputeKernel
+  insize=2496 file=C:/Users/gsocc/OneDrive/Desktop/Github/CubeScapeGame/CubeScapeProject/Assets/Shaders/Compute/VoxelMeshCreationShader.compute kernel=CSMain cachingPP=1 ppOnly=0 stripLineD=0 buildPlatform=5 km=<UNITY_VERSION=202035> pKW=UNITY_ENABLE_REFLECTION_BUFFERS UNITY_USE_DITHER_MASK_FOR_ALPHABLENDED_SHADOWS UNITY_PBS_USE_BRDF1 UNITY_SPECCUBE_BOX_PROJECTION UNITY_SPECCUBE_BLENDING UNITY_ENABLE_DETAIL_NORMALMAP SHADER_API_DESKTOP UNITY_LIGHT_PROBE_PROXY_VOLUME UNITY_LIGHTMAP_RGBM_ENCODING uKW=SHADER_STAGE_COMPUTE platform=d3d11 flags=0  error: 2 plat 4 at C:/Users/gsocc/OneDrive/Desktop/Github/CubeScapeGame/CubeScapeProject/Assets/Shaders/Includes/CubeMeshData.cginc(40): 'CubeFaceVertices': void functions cannot return a value
+ ok=0 outsize=0
+
+
+

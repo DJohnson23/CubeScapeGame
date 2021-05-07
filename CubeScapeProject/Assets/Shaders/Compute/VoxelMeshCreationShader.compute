@@ -1,17 +1,17 @@
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel CSMain
 
-struct Triangle
-{
-	int a;
-	int b;
-	int c;
-};
+#include "../Includes/CubeMeshData.cginc"
 
-struct Vertex {
-	float3 position;
-	float3 normal;
-	float4 color;
+struct Quad
+{
+    float3 a;
+    float3 b;
+    float3 c;
+    float3 d;
+
+    float3 normal;
+    float4 color;
 };
 
 struct TerrainVoxel
@@ -25,19 +25,18 @@ struct TerrainVoxel
 
 struct VoxelType {
     int minHeight;
-    int scale;
+    float scale;
     float3 center;
 };
 
 RWStructuredBuffer<TerrainVoxel> voxels;
 RWStructuredBuffer<VoxelType> voxelTypes;
-AppendStructuredBuffer<Triangle> triangles;
-AppendStructuredBuffer<Vertex> vertices;
 
-int chunkSize;
-int textureSize;
+uint chunkSize;
 
-bool IsValidCoord(int3 index)
+AppendStructuredBuffer<Quad> quadList;
+
+bool IsValidCoord(uint3 index)
 {
     return index.x < chunkSize && index.y < chunkSize && index.z < chunkSize
         && index.x >= 0 && index.y >= 0 && index.z >= 0;
@@ -63,29 +62,43 @@ int3 to3D(int idx)
     return int3( x, y, z );
 }
 
+static int3 _NeighborOffsets[6] =
+{
+    int3(0, 0, 1),
+    int3(1, 0, 0),
+    int3(0, 0,-1),
+    int3(-1, 0, 0),
+    int3(0, 1, 0),
+    int3(0,-1, 0)
+};
+
 [numthreads(8,8,8)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
-    TerrainVoxel voxel = voxels[to1D(id.x, id.y, id.z)];
+    if (id.x >= chunkSize || id.y >= chunkSize || id.z >= chunkSize) {
+        return;
+    }
 
+    TerrainVoxel voxel = voxels[to1D(id.x, id.y, id.z)];
 
     if (!voxel.active)
     {
         return;
     }
 
-    /*
+    
     for (int i = 0; i < 6; i++)
     {
-        Vector3[] faceVerts = CubeMeshData.FaceVertices(i);
-        Vector3 n = CubeMeshData.normals[i];
+        float3 faceVerts[4];
+        CubeFaceVertices(faceVerts, i);
+        float3 n = _CubeNormals[i];
 
-        Vector3Int offsetCoord = neighborOffsets[i];
-        Vector3Int neighborCoord = new Vector3Int(voxel.coord.x + offsetCoord.x, voxel.coord.y + offsetCoord.y, voxel.coord.z + offsetCoord.z);
+        int3 offsetCoord = _NeighborOffsets[i];
+        int3 neighborCoord = int3(voxel.coord.x + offsetCoord.x, voxel.coord.y + offsetCoord.y, voxel.coord.z + offsetCoord.z);
 
         if (IsValidCoord(neighborCoord))
         {
-            TerrainVoxel adjacent = terrainVoxels[to1D(neighborCoord.x, neighborCoord.y, neighborCoord.z)];
+            TerrainVoxel adjacent = voxels[to1D(neighborCoord.x, neighborCoord.y, neighborCoord.z)];
 
             if (adjacent.active)
             {
@@ -93,29 +106,17 @@ void CSMain (uint3 id : SV_DispatchThreadID)
             }
         }
 
-        vertices.Add(faceVerts[0] + voxel.localPosition);
-        vertices.Add(faceVerts[1] + voxel.localPosition);
-        vertices.Add(faceVerts[2] + voxel.localPosition);
-        vertices.Add(faceVerts[3] + voxel.localPosition);
+        Quad newQuad;
 
-        normals.Add(n);
-        normals.Add(n);
-        normals.Add(n);
-        normals.Add(n);
+        newQuad.a = faceVerts[0] + voxel.localPosition;
+        newQuad.b = faceVerts[1] + voxel.localPosition;
+        newQuad.c = faceVerts[2] + voxel.localPosition;
+        newQuad.d = faceVerts[3] + voxel.localPosition;
 
-        colors.Add(voxCol);
-        colors.Add(voxCol);
-        colors.Add(voxCol);
-        colors.Add(voxCol);
+        newQuad.normal = n;
+        newQuad.color = voxel.color;
 
-        triangles.Add(vertices.Count - 4);
-        triangles.Add(vertices.Count - 3);
-        triangles.Add(vertices.Count - 2);
-
-        triangles.Add(vertices.Count - 4);
-        triangles.Add(vertices.Count - 2);
-        triangles.Add(vertices.Count - 1);
-
+        quadList.Append(newQuad);
     }
-    */
+    
 }

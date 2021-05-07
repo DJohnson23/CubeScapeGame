@@ -4,6 +4,7 @@ using UnityEngine;
 
 public class MapGenerator : MonoBehaviour
 {
+    public ComputeShader meshGenerationShader;
     public bool autoRefresh = true;
     public bool generateDisplay;
     public ShapeSettings shapeSettings;
@@ -68,7 +69,7 @@ public class MapGenerator : MonoBehaviour
                 for(int y = 0; y < numChunks; y++)
                 {
                     Vector3 position = new Vector3(x * shapeSettings.chunkSize, y * shapeSettings.chunkSize, z * shapeSettings.chunkSize);
-                    chunks[index++] = new MapChunk(this, position, heightMap);
+                    chunks[index++] = new MapChunk(this, position, heightMap, meshGenerationShader);
                 }
             }
         }
