@@ -10,12 +10,14 @@ public class MapGeneratorEditor : Editor
     Editor editor;
 
     bool showShapeSettings = false;
+    bool showVoxelTypes = false;
+
+    Dictionary<string, bool> showType = new Dictionary<string, bool>();
 
     public override void OnInspectorGUI()
     {
         mapGen = (MapGenerator)target;
-
-        if(DrawDefaultInspector())
+        if (DrawDefaultInspector() && mapGen.autoRefresh)
         {
             mapGen.RefreshMap();
         }
@@ -26,6 +28,10 @@ public class MapGeneratorEditor : Editor
         {
             DrawShapeSettings(shapeSettings);
         }
+
+        VoxelType[] voxelTypes = mapGen.voxelTypes;
+
+        DrawVoxelTypes(voxelTypes);
 
         if(GUILayout.Button("Generate"))
         {
@@ -43,9 +49,49 @@ public class MapGeneratorEditor : Editor
         {
             EditorGUI.indentLevel++;
 
-            if (editor.DrawDefaultInspector())
+            if (editor.DrawDefaultInspector() && mapGen.autoRefresh)
             {
                 mapGen.RefreshMap();
+            }
+
+            EditorGUI.indentLevel--;
+        }
+    }
+
+    void DrawVoxelTypes(VoxelType[] voxelTypes)
+    {
+        showVoxelTypes = EditorGUILayout.Foldout(showVoxelTypes, "Voxel Types");
+
+        if(showVoxelTypes)
+        {
+            EditorGUI.indentLevel++;
+
+            foreach(VoxelType type in voxelTypes)
+            {
+                if(!showType.ContainsKey(type.name))
+                {
+                    showType.Add(type.name, false);
+                }
+
+                bool show = showType[type.name];
+
+                show = EditorGUILayout.Foldout(show, type.name);
+
+                showType[type.name] = show;
+
+                if(show)
+                {
+                    EditorGUI.indentLevel++;
+
+                    CreateCachedEditor(type, null, ref editor);
+
+                    if (editor.DrawDefaultInspector() && mapGen.autoRefresh)
+                    {
+                        mapGen.RefreshMap();
+                    }
+
+                    EditorGUI.indentLevel--;
+                }
             }
 
             EditorGUI.indentLevel--;
