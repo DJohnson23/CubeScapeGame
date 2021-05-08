@@ -86,6 +86,7 @@ public class MapChunk
         RefreshChunk();
     }
 
+    
     public void RefreshChunk()
     {
         numCubes = chunkSize * chunkSize * chunkSize;
@@ -103,6 +104,8 @@ public class MapChunk
         mFilter.sharedMesh = mesh;
         mRenderer.sharedMaterial = material;
     }
+    
+    
 
     void InitVoxels()
     {
@@ -155,9 +158,6 @@ public class MapChunk
             return;
         }
 
-        Stopwatch sw = new Stopwatch();
-        sw.Start();
-
         ComputeBuffer voxelsBuffer = new ComputeBuffer(terrainVoxels.Length, sizeof(int) + sizeof(float) * 7 + sizeof(int) * 4);
         ComputeBuffer voxelTypesBuffer = new ComputeBuffer(mapGen.voxelTypes.Length, sizeof(int) + sizeof(float) * 4);
 
@@ -203,10 +203,6 @@ public class MapChunk
         int v = 0;
         int t = 0;
 
-        Stopwatch sw2 = new Stopwatch();
-
-        sw2.Start();
-
         vertices = new Vector3[quadList.Length * 4];
         normals = new Vector3[vertices.Length];
         colors = new Color[vertices.Length];
@@ -240,17 +236,9 @@ public class MapChunk
             v += 4;
         }
 
-        sw2.Stop();
-
-        UnityEngine.Debug.Log("sw2: " + sw2.Elapsed);
-
         argsBuffer.Release();
         voxelsBuffer.Release();
         voxelTypesBuffer.Release();
         quadListBuffer.Release();
-
-        sw.Stop();
-
-        UnityEngine.Debug.Log("sw: " + sw.Elapsed);
     }
 }

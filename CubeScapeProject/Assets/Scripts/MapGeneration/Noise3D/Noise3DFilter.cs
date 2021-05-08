@@ -14,7 +14,7 @@ public class Noise3DFilter
 
     public float Evaluate(Vector3 point)
     {
-        float noiseValue = (noise.Evaluate(point * (settings.scale / 100) + settings.center) + 1) * 0.5f;
+        float noiseValue = (noise.Evaluate(point / settings.scale + settings.center) + 1) * 0.5f;
         return noiseValue;
     }
 }

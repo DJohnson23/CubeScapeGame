@@ -41,7 +41,7 @@ MonoBehaviour:
     m_Mode: 0
     m_NumColorKeys: 2
     m_NumAlphaKeys: 2
-  minHeight: 4
+  minHeight: 5
   noiseSettings:
-    scale: 10
+    scale: 20
     center: {x: 0, y: 0, z: 0}
