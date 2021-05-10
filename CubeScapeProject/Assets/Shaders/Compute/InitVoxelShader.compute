@@ -5,9 +5,7 @@
 
 struct TerrainVoxel
 {
-    int active;
-    float3 localPosition;
-    int typeIndex;
+    int data;
 };
 
 struct VoxelType {
@@ -39,11 +37,12 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 
     float worldY = y + position.y;
 
-    TerrainVoxel newVoxel;
-    newVoxel.localPosition = float3(x + 0.5f, y + 0.5f, z + 0.5f);
-    newVoxel.active = worldY < heightMap[z * chunkSize + x] ? 1 : 0;
+    int data = worldY < heightMap[z * chunkSize + x];
+    data |= x << 1;
+    data |= y << 5;
+    data |= z << 9;
 
-    if (newVoxel.active == 1)
+    if (data & 1)
     {
         numActive.IncrementCounter();
     }
@@ -55,7 +54,10 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         typeIndex++;
     }
 
-    newVoxel.typeIndex = typeIndex;
+    data |= typeIndex << 13;
+
+    TerrainVoxel newVoxel;
+    newVoxel.data = data;
 
     terrainVoxels[to1D(x, y, z, chunkSize)] = newVoxel;
 }

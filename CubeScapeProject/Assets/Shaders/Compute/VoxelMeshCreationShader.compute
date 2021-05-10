@@ -4,6 +4,7 @@
 #include "../Includes/CubeMeshData.cginc"
 #include "../Includes/ArrayUtils.cginc"
 #include "../Includes/Noise3D.cginc"
+#include "../Includes/VoxelUtils.cginc"
 
 struct Quad
 {
@@ -18,9 +19,7 @@ struct Quad
 
 struct TerrainVoxel
 {
-	int active;
-	float3 localPosition;
-	int typeIndex;
+    int data;
 };
 
 struct VoxelType {
@@ -72,13 +71,18 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 
     TerrainVoxel voxel = voxels[to1D(id.x, id.y, id.z, chunkSize)];
 
-    if (!voxel.active)
+    bool active = UnpackActive(voxel.data);
+
+    if (!active)
     {
         return;
     }
 
-    float colorNoiseVal = EvaluateNoise(voxelTypes[voxel.typeIndex], voxel.localPosition + position);
-    float4 color = EvaluateColor(voxelTypes[voxel.typeIndex], colorNoiseVal);
+    float3 localPosition = UnpackPosition(voxel.data);
+    int typeId = UnpackTypeId(voxel.data);
+
+    float colorNoiseVal = EvaluateNoise(voxelTypes[typeId], localPosition + position);
+    float4 color = EvaluateColor(voxelTypes[typeId], colorNoiseVal);
     
     for (int i = 0; i < 6; i++)
     {
@@ -93,7 +97,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         {
             TerrainVoxel adjacent = voxels[to1D(neighborCoord.x, neighborCoord.y, neighborCoord.z, chunkSize)];
 
-            if (adjacent.active)
+            if (UnpackActive(adjacent.data))
             {
                 continue;
             }
@@ -101,10 +105,10 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 
         Quad newQuad;
 
-        newQuad.a = faceVerts[0] + voxel.localPosition;
-        newQuad.b = faceVerts[1] + voxel.localPosition;
-        newQuad.c = faceVerts[2] + voxel.localPosition;
-        newQuad.d = faceVerts[3] + voxel.localPosition;
+        newQuad.a = faceVerts[0] + localPosition;
+        newQuad.b = faceVerts[1] + localPosition;
+        newQuad.c = faceVerts[2] + localPosition;
+        newQuad.d = faceVerts[3] + localPosition;
 
         newQuad.normal = n;
         newQuad.color = color;

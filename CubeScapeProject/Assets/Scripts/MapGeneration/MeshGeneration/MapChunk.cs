@@ -6,9 +6,55 @@ public class MapChunk
 {
     struct TerrainVoxel
     {
-        public int active;
-        public Vector3 localPosition;
-        public int typeIndex;
+        public int data;
+
+        public Vector3 localPosition
+        {
+            get
+            {
+                int x = (data >> 1) & 0xF;
+                int y = (data >> 5) & 0xF;
+                int z = (data >> 9) & 0xF;
+
+                return new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
+            }
+
+            set
+            {
+                data &= ~(0xFFF << 1);
+                data |= (int)value.x << 1;
+                data |= (int)value.y << 5;
+                data |= (int)value.z << 9;
+            }
+        }
+
+        public bool active
+        {
+            get
+            {
+                return (data & 0x1) == 1;
+            }
+
+            set
+            {
+                data &= ~1;
+                data |= value ? 1 : 0;
+            }
+        }
+
+        public int typeId
+        {
+            get
+            {
+                return data >> 13;
+            }
+
+            set
+            {
+                data &= 0x1FFF;
+                data |= value << 13;
+            }
+        }
     }
 
     struct Quad
@@ -76,7 +122,7 @@ public class MapChunk
     {
         terrainVoxels = new TerrainVoxel[numCubes];
 
-        ComputeBuffer voxelsBuffer = new ComputeBuffer(terrainVoxels.Length, sizeof(float) * 3 + sizeof(int) * 2);
+        ComputeBuffer voxelsBuffer = new ComputeBuffer(terrainVoxels.Length, sizeof(int));
         ComputeBuffer voxelTypesBuffer = new ComputeBuffer(mapGen.voxelTypes.Length, sizeof(int) + sizeof(float) * 12);
         ComputeBuffer heightMapBuffer = new ComputeBuffer(heightMap.Length, sizeof(int));
         ComputeBuffer numActiveBuffer = new ComputeBuffer(terrainVoxels.Length, sizeof(int), ComputeBufferType.Counter);
@@ -124,7 +170,7 @@ public class MapChunk
             return;
         }
 
-        ComputeBuffer voxelsBuffer = new ComputeBuffer(terrainVoxels.Length, sizeof(float) * 3 + sizeof(int) * 2);
+        ComputeBuffer voxelsBuffer = new ComputeBuffer(terrainVoxels.Length, sizeof(int));
         ComputeBuffer voxelTypesBuffer = new ComputeBuffer(mapGen.voxelTypes.Length, sizeof(int) + sizeof(float) * 12);
 
         ComputeBuffer quadListBuffer = new ComputeBuffer(numActive * 6, sizeof(float) * 19, ComputeBufferType.Append);
