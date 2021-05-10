@@ -2,6 +2,8 @@
 #pragma kernel CSMain
 
 #include "../Includes/CubeMeshData.cginc"
+#include "../Includes/ArrayUtils.cginc"
+#include "../Includes/Noise3D.cginc"
 
 struct Quad
 {
@@ -18,19 +20,20 @@ struct TerrainVoxel
 {
 	int active;
 	float3 localPosition;
-	int3 coord;
 	int typeIndex;
-    float4 color;
 };
 
 struct VoxelType {
     int minHeight;
     float scale;
     float3 center;
+    float4 lightCol;
+    float4 darkCol;
 };
 
 RWStructuredBuffer<TerrainVoxel> voxels;
 RWStructuredBuffer<VoxelType> voxelTypes;
+float3 position;
 
 uint chunkSize;
 
@@ -40,26 +43,6 @@ bool IsValidCoord(uint3 index)
 {
     return index.x < chunkSize && index.y < chunkSize && index.z < chunkSize
         && index.x >= 0 && index.y >= 0 && index.z >= 0;
-}
-
-int to1D(int x, int y, int z)
-{
-    int yMax = chunkSize;
-    int zMax = chunkSize;
-
-    return (x * zMax * yMax) + (y * zMax) + z;
-}
-
-int3 to3D(int idx)
-{
-    int yMax = chunkSize;
-    int zMax = chunkSize;
-
-    int x = idx / (zMax * yMax);
-    idx -= (x * zMax * yMax);
-    int y = idx / zMax;
-    int z = idx % zMax;
-    return int3( x, y, z );
 }
 
 static int3 _NeighborOffsets[6] =
@@ -72,20 +55,30 @@ static int3 _NeighborOffsets[6] =
     int3(0,-1, 0)
 };
 
-[numthreads(8,8,8)]
+float EvaluateNoise(VoxelType voxType, float3 position) {
+    return (noise(position / voxType.scale + voxType.center) + 1) * 0.5f;
+}
+
+float4 EvaluateColor(VoxelType voxType, float t) {
+    return voxType.lightCol + t * (voxType.darkCol - voxType.lightCol);
+}
+
+[numthreads(10,10,10)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
     if (id.x >= chunkSize || id.y >= chunkSize || id.z >= chunkSize) {
         return;
     }
 
-    TerrainVoxel voxel = voxels[to1D(id.x, id.y, id.z)];
+    TerrainVoxel voxel = voxels[to1D(id.x, id.y, id.z, chunkSize)];
 
     if (!voxel.active)
     {
         return;
     }
 
+    float colorNoiseVal = EvaluateNoise(voxelTypes[voxel.typeIndex], voxel.localPosition + position);
+    float4 color = EvaluateColor(voxelTypes[voxel.typeIndex], colorNoiseVal);
     
     for (int i = 0; i < 6; i++)
     {
@@ -94,11 +87,11 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         float3 n = _CubeNormals[i];
 
         int3 offsetCoord = _NeighborOffsets[i];
-        int3 neighborCoord = int3(voxel.coord.x + offsetCoord.x, voxel.coord.y + offsetCoord.y, voxel.coord.z + offsetCoord.z);
+        int3 neighborCoord = int3(id.x + offsetCoord.x, id.y + offsetCoord.y, id.z + offsetCoord.z);
 
         if (IsValidCoord(neighborCoord))
         {
-            TerrainVoxel adjacent = voxels[to1D(neighborCoord.x, neighborCoord.y, neighborCoord.z)];
+            TerrainVoxel adjacent = voxels[to1D(neighborCoord.x, neighborCoord.y, neighborCoord.z, chunkSize)];
 
             if (adjacent.active)
             {
@@ -114,7 +107,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         newQuad.d = faceVerts[3] + voxel.localPosition;
 
         newQuad.normal = n;
-        newQuad.color = voxel.color;
+        newQuad.color = color;
 
         quadList.Append(newQuad);
     }

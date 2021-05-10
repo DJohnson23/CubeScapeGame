@@ -6,7 +6,9 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "NewVoxelType", menuName = "VoxelTerrain/VoxelType")]
 public class VoxelType : ScriptableObject
 {
-    public Gradient colorGradient;
+    public Color lightCol;
+    public Color darkCol;
+
     public int minHeight;
     public Noise3DSettings noiseSettings;
 
@@ -19,10 +21,15 @@ public class VoxelType : ScriptableObject
 
         for(int i = 0; i < size; i++)
         {
-            colors[i] = colorGradient.Evaluate(step * i);
+            colors[i] = EvaluateCol(step * i);
         }
 
         tex.SetPixels(colors);
         return tex;
+    }
+
+    public Color EvaluateCol(float t)
+    {
+        return lightCol + t * (darkCol - lightCol);
     }
 }

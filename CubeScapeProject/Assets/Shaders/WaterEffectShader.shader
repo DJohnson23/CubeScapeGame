@@ -48,7 +48,7 @@ Shader "Hidden/WaterEffectShader"
                 float3 lerp(float3 a, float3 b, float t) {
                     t = saturate(t);
 
-                    return a * (1 - t) + b * t;
+                    return a + t * (b - a);
                 }
 
                 sampler2D _MainTex;

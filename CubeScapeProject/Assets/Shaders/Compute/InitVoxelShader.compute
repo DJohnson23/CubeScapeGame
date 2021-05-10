@@ -1,0 +1,61 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+#include "../Includes/ArrayUtils.cginc"
+
+struct TerrainVoxel
+{
+    int active;
+    float3 localPosition;
+    int typeIndex;
+};
+
+struct VoxelType {
+    int minHeight;
+    float scale;
+    float3 center;
+    float4 lightCol;
+    float4 darkCol;
+};
+
+RWStructuredBuffer<TerrainVoxel> terrainVoxels;
+RWStructuredBuffer<VoxelType> voxelTypes;
+RWStructuredBuffer<int> heightMap;
+RWStructuredBuffer<int> numActive;
+
+
+uint chunkSize;
+float3 position;
+uint numVoxelTypes;
+
+[numthreads(10,10,10)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= chunkSize || id.y >= chunkSize || id.z >= chunkSize) {
+        return;
+    }
+
+    uint x = id.x, y = id.y, z = id.z;
+
+    float worldY = y + position.y;
+
+    TerrainVoxel newVoxel;
+    newVoxel.localPosition = float3(x + 0.5f, y + 0.5f, z + 0.5f);
+    newVoxel.active = worldY < heightMap[z * chunkSize + x] ? 1 : 0;
+
+    if (newVoxel.active == 1)
+    {
+        numActive.IncrementCounter();
+    }
+
+    uint typeIndex = 0;
+
+    while (typeIndex < numVoxelTypes - 1 && voxelTypes[typeIndex + 1].minHeight < worldY)
+    {
+        typeIndex++;
+    }
+
+    newVoxel.typeIndex = typeIndex;
+
+    terrainVoxels[to1D(x, y, z, chunkSize)] = newVoxel;
+}
