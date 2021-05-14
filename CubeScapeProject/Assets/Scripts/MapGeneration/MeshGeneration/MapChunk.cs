@@ -70,12 +70,12 @@ public class MapChunk
 
     MapGenerator mapGen;
 
-    int chunkSize;
     int[] heightMap;
     Material material;
     Vector3 position;
 
-    int numCubes;
+    const int numCubes =  MapGenerator.chunkSize * MapGenerator.chunkSize * MapGenerator.chunkSize;
+
     TerrainVoxel[] terrainVoxels;
 
     GameObject chunkObj;
@@ -91,7 +91,6 @@ public class MapChunk
     {
         this.mapGen = mapGen;
         this.position = position;
-        this.chunkSize = mapGen.shapeSettings.chunkSize;
         this.material = mapGen.mapMaterial;
         this.heightMap = heightMap;
         this.genMeshShader = genMeshShader;
@@ -110,8 +109,6 @@ public class MapChunk
     
     public void RefreshChunk()
     {
-        numCubes = chunkSize * chunkSize * chunkSize;
-
         InitVoxels();
 
         CreateMesh();
@@ -137,11 +134,11 @@ public class MapChunk
         initVoxelsShader.SetBuffer(0, "voxelTypes", voxelTypesBuffer);
         initVoxelsShader.SetBuffer(0, "heightMap", heightMapBuffer);
         initVoxelsShader.SetBuffer(0, "numActive", numActiveBuffer);
-        initVoxelsShader.SetInt("chunkSize", chunkSize);
+        initVoxelsShader.SetInt("chunkSize", MapGenerator.chunkSize);
         initVoxelsShader.SetVector("position", position);
         initVoxelsShader.SetInt("numVoxelTypes", mapGen.voxelTypes.Length);
 
-        int numGroups = Mathf.CeilToInt(chunkSize / 10f);
+        int numGroups = Mathf.CeilToInt(MapGenerator.chunkSize / 10f);
 
         initVoxelsShader.Dispatch(0, numGroups, numGroups, numGroups);
 
@@ -182,10 +179,10 @@ public class MapChunk
         genMeshShader.SetBuffer(0, "voxels", voxelsBuffer);
         genMeshShader.SetBuffer(0, "voxelTypes", voxelTypesBuffer);
         genMeshShader.SetBuffer(0, "quadList", quadListBuffer);
-        genMeshShader.SetInt("chunkSize", chunkSize);
+        genMeshShader.SetInt("chunkSize", MapGenerator.chunkSize);
         genMeshShader.SetVector("position", position);
 
-        int numGroups = Mathf.CeilToInt(chunkSize / 10f);
+        int numGroups = Mathf.CeilToInt(MapGenerator.chunkSize / 10f);
 
         genMeshShader.Dispatch(0, numGroups, numGroups, numGroups);
 

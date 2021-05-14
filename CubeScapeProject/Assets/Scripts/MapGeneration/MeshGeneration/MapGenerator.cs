@@ -14,10 +14,11 @@ public struct ShaderVoxelType
 
 public class MapGenerator : MonoBehaviour
 {
+    public const int chunkSize = 16;
+
+    public bool autoRefresh = true;
     public ComputeShader meshGenerationShader;
     public ComputeShader initVoxelsShader;
-    public bool autoRefresh = true;
-    public bool generateDisplay;
     public ShapeSettings shapeSettings;
 
     public Material mapMaterial;
@@ -26,9 +27,7 @@ public class MapGenerator : MonoBehaviour
     public VoxelType[] voxelTypes;
     public ShaderVoxelType[] shaderVoxelTypes { get; private set; }
 
-    public Noise3DFilter[] voxColNoiseFilters { get; private set; }
-
-    MapChunk[] chunks;
+    Dictionary<Vector3, MapChunk> mapChunks;
 
     int worldSize;
 
@@ -39,7 +38,7 @@ public class MapGenerator : MonoBehaviour
 
     public void RefreshMap()
     {
-        worldSize = shapeSettings.chunkSize * shapeSettings.worldChunks;
+        worldSize = chunkSize * shapeSettings.worldChunks;
 
         shaderVoxelTypes = new ShaderVoxelType[voxelTypes.Length];
 
@@ -49,8 +48,8 @@ public class MapGenerator : MonoBehaviour
 
             ShaderVoxelType newType = new ShaderVoxelType();
             newType.minHeight = voxType.minHeight;
-            newType.scale = voxType.noiseSettings.scale;
-            newType.center = voxType.noiseSettings.center;
+            newType.scale = voxType.noiseScale;
+            newType.center = voxType.noiseCenter;
             newType.lightCol = voxType.lightCol;
             newType.darkCol = voxType.darkCol;
 
@@ -62,14 +61,7 @@ public class MapGenerator : MonoBehaviour
             DestroyImmediate(transform.GetChild(i).gameObject);
         }
 
-        chunks = new MapChunk[numChunks * numChunks * numChunks];
-
-        voxColNoiseFilters = new Noise3DFilter[voxelTypes.Length];
-
-        for(int i = 0; i < voxColNoiseFilters.Length; i++)
-        {
-            voxColNoiseFilters[i] = new Noise3DFilter(voxelTypes[i].noiseSettings);
-        }
+        mapChunks = new Dictionary<Vector3, MapChunk>();
 
         int index = 0;
 
@@ -83,12 +75,13 @@ public class MapGenerator : MonoBehaviour
         {
             for(int z = -halfNum; z < numChunks - halfNum; z++)
             {
-                int[] heightMap = GenerateHeightMap(shapeSettings.chunkSize, shapeSettings.chunkSize, new Vector2(x * shapeSettings.chunkSize, z * shapeSettings.chunkSize));
+                int[] heightMap = GenerateHeightMap(chunkSize, chunkSize, new Vector2(x * chunkSize, z * chunkSize));
 
                 for(int y = 0; y < numChunks; y++)
                 {
-                    Vector3 position = new Vector3(x * shapeSettings.chunkSize, y * shapeSettings.chunkSize, z * shapeSettings.chunkSize);
-                    chunks[index++] = new MapChunk(this, position, heightMap, meshGenerationShader, initVoxelsShader);
+                    Vector3 position = new Vector3(x * chunkSize, y * chunkSize, z * chunkSize);
+                    MapChunk newChunk = new MapChunk(this, position, heightMap, meshGenerationShader, initVoxelsShader);
+                    mapChunks.Add(position, newChunk);
                 }
             }
         }

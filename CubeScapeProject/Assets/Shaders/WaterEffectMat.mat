@@ -8,7 +8,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: WaterEffectMat
-  m_Shader: {fileID: 4800000, guid: c5dc01fe388f9ad40bdb539ef9763ccd, type: 3}
+  m_Shader: {fileID: 4800000, guid: ba8199a7cbf35154d8f402132551fa9b, type: 3}
   m_ShaderKeywords: 
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -24,13 +24,9 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Floats:
-    - _Cloudiness: 2.5
     - _ColorBlock: 0.6
     - _SeaLevel: 4.9
     - _SightDist: 10
-    - _Steepness: 0.05
     m_Colors:
-    - BoundsMax: {r: 0, g: 38.29, b: 87.53, a: 0}
-    - BoundsMin: {r: -61.24, g: 0, b: 0, a: 0}
-    - _WaterColor: {r: 0, g: 0.3782748, b: 0.745283, a: 1}
+    - _WaterColor: {r: 0, g: 0.48235294, b: 1, a: 1}
   m_BuildTextureStacks: []

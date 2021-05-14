@@ -15,6 +15,5 @@ MonoBehaviour:
   lightCol: {r: 0.6037736, g: 0.5059368, b: 0.39587042, a: 1}
   darkCol: {r: 0.4528302, g: 0.3823425, b: 0.30544677, a: 1}
   minHeight: 20
-  noiseSettings:
-    scale: 10
-    center: {x: 20, y: 20, z: 20}
+  noiseScale: 10
+  noiseCenter: {x: 0, y: 0, z: 0}

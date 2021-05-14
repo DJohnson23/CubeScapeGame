@@ -24,14 +24,14 @@ public static class Noise2D
 
         Vector2[] octaveOffsets = new Vector2[octaves];
 
-        for(int i = 0; i < octaves; i++)
+        for (int i = 0; i < octaves; i++)
         {
             float offsetX = prng.Next(-100000, 100000);
             float offsetY = prng.Next(-100000, 100000);
             octaveOffsets[i] = new Vector2(offsetX, offsetY);
         }
 
-        if(scale <= 0)
+        if (scale <= 0)
         {
             scale = 0.0001f;
         }
@@ -44,15 +44,15 @@ public static class Noise2D
         float halfWidth = mapWidth / 2f;
         float halfHeight = mapHeight / 2f;
 
-        for(int y = 0; y < mapHeight; y++)
+        for (int y = 0; y < mapHeight; y++)
         {
-            for(int x = 0; x < mapWidth; x++)
+            for (int x = 0; x < mapWidth; x++)
             {
                 float amplitude = 1;
                 float frequency = 1;
                 float noiseHeight = 0;
 
-                for(int i = 0; i < octaves; i++)
+                for (int i = 0; i < octaves; i++)
                 {
                     float sampleX = (x - halfWidth + offset.x) / scale * frequency + octaveOffsets[i].x;
                     float sampleY = (y - halfHeight + offset.y) / scale * frequency + octaveOffsets[i].y;

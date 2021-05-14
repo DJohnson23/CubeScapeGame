@@ -10,7 +10,9 @@ public class VoxelType : ScriptableObject
     public Color darkCol;
 
     public int minHeight;
-    public Noise3DSettings noiseSettings;
+
+    public float noiseScale;
+    public Vector3 noiseCenter;
 
     public Texture2D CreateGradientTex(int size)
     {

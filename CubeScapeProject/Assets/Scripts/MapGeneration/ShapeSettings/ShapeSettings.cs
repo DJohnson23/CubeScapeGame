@@ -7,7 +7,6 @@ using UnityEngine;
 public class ShapeSettings : ScriptableObject
 {
     public Noise2DSettings noiseSettings;
-    public int chunkSize = 32;
     public int maxSurfaceHeight = 2;
     public int minSurfaceHeight = 1;
     public int worldChunks = 10;
